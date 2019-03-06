@@ -39,19 +39,13 @@ dependencies {
     // LWJGL
     compile "org.lwjgl:lwjgl:${lwjglVersion}"
     compile "org.lwjgl:lwjgl-glfw:${lwjglVersion}"
-    compile "org.lwjgl:lwjgl-assimp:${lwjglVersion}"
     compile "org.lwjgl:lwjgl-openal:${lwjglVersion}"
     compile "org.lwjgl:lwjgl-stb:${lwjglVersion}"
     compile "org.lwjgl:lwjgl-vulkan:$lwjglVersion"
-    compile "org.lwjgl:lwjgl-jemalloc:${lwjglVersion}"
-    compile "org.lwjgl:lwjgl-opengl:${lwjglVersion}"
     runtime "org.lwjgl:lwjgl:${lwjglVersion}:${lwjglNatives}"
-    runtime "org.lwjgl:lwjgl-jemalloc:${lwjglVersion}:${lwjglNatives}"
     runtime "org.lwjgl:lwjgl-glfw:${lwjglVersion}:${lwjglNatives}"
-    runtime "org.lwjgl:lwjgl-assimp:${lwjglVersion}:${lwjglNatives}"
     runtime "org.lwjgl:lwjgl-openal:${lwjglVersion}:${lwjglNatives}"
     runtime "org.lwjgl:lwjgl-stb:${lwjglVersion}:${lwjglNatives}"
-    runtime "org.lwjgl:lwjgl-opengl:${lwjglVersion}:${lwjglNatives}"
 
 
     compile "org.joml:joml:${jomlVersion}"
