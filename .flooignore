@@ -4,6 +4,3 @@ tmp
 vendor
 .idea/workspace.xml
 .idea/misc.xml
-.gradle
-.idea
-out
