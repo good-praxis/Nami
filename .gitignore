@@ -1,5 +1,4 @@
 .DS_STORE
 .idea/*
 out
-.floo
-.flooignore
+.gradle
