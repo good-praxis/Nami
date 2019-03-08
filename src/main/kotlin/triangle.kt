@@ -8,11 +8,12 @@ import org.lwjgl.system.MemoryUtil.*
 import org.lwjgl.vulkan.VK10.*
 import org.lwjgl.vulkan.*
 
-class HelloTriangle {
+object HelloTriangle {
     val nullptr = NULL
     private val WIDTH = 800
     private val HEIGHT = 600
     private var windowPointer: Long = -1
+    private const val enableValidationLayers = true
     private lateinit var vkInstance: VkInstance
 
 
@@ -87,11 +88,4 @@ class HelloTriangle {
 
         glfwTerminate()
     }
-}
-
-fun main(args: Array<String>) {
-    val app = HelloTriangle()
-
-    app.run()
-
 }
