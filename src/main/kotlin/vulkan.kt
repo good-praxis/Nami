@@ -1,12 +1,14 @@
 package com.code.gamerg8.nami
 
+import com.code.gamerg8.nami.vulkan.*
 import org.lwjgl.BufferUtils
 import org.lwjgl.PointerBuffer
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.*
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.EXTDebugReport.*
-import org.lwjgl.vulkan.KHRSurface.vkGetPhysicalDeviceSurfaceSupportKHR
+import org.lwjgl.vulkan.KHRSurface.vkDestroySurfaceKHR
+import org.lwjgl.vulkan.KHRSwapchain.*
 import org.lwjgl.vulkan.VK10.*
 
 
@@ -15,10 +17,11 @@ object Vulkan {
     const val HEIGHT = 600
     const val enableValidationLayers = true
     val validationLayers = arrayOf("VK_LAYER_LUNARG_standard_validation")
+    val deviceExtensions = arrayOf(VK_KHR_SWAPCHAIN_EXTENSION_NAME)
 
     private lateinit var window: Window
     private lateinit var vkInstance: VkInstance
-    private lateinit var physicalDevice: VkPhysicalDevice
+    private lateinit var device: Device
 
     fun run() {
         this.window = Window(WIDTH, HEIGHT)
@@ -29,68 +32,24 @@ object Vulkan {
         cleanup()
     }
 
+    fun getVkInstance(): VkInstance {
+        return vkInstance
+    }
+
+    fun getWindow(): Window {
+        return window
+    }
+
 
     private fun initVulkan() {
         vkInstance = createVulkanInstance()
         setupDebugCallback()
-        physicalDevice = pickPhysicalDevice()
+        window.getVulkanSurface()
+        device = Device()
+        device.pickAndBindDevice()
 
     }
 
-    private fun pickPhysicalDevice(): VkPhysicalDevice{
-        MemoryStack.stackPush().use {
-            val deviceCountBuffer = it.mallocInt(1)
-            vkEnumeratePhysicalDevices(vkInstance,deviceCountBuffer,null)
-            if (deviceCountBuffer[0] == 0){
-                error("failed to find GPUs with Vulkan support!")
-            }
-            val deviceBuffer = memAllocPointer(deviceCountBuffer[0])
-            vkEnumeratePhysicalDevices(vkInstance, deviceCountBuffer, deviceBuffer)
-
-            for(i in 0 until deviceCountBuffer[0]) {
-                val handle = deviceBuffer[i]
-                val device = VkPhysicalDevice(handle, vkInstance)
-
-                if (isDeviceSuitable(device)) {
-                    return device
-                }
-            }
-            error("No suitable GPU found")
-
-        }
-    }
-
-
-    private fun isDeviceSuitable(device: VkPhysicalDevice): Boolean {
-        val indices = findQueueFamilies(device)
-        if(!indices.isComplete)
-            return false
-        return true
-    }
-
-    private fun findQueueFamilies(device: VkPhysicalDevice): QueueFamilyIndices {
-        val indices = QueueFamilyIndices()
-        val count = memAllocInt(1)
-        vkGetPhysicalDeviceQueueFamilyProperties(device, count, null)
-        val families = VkQueueFamilyProperties.calloc(count[0])
-        vkGetPhysicalDeviceQueueFamilyProperties(device, count, families)
-
-        var i = 0
-        families.forEach {  queueFamily ->
-            if(queueFamily.queueCount() > 0 && queueFamily.queueFlags() and VK_QUEUE_GRAPHICS_BIT != 0) {
-                indices.graphicsFamily = i
-            }
-
-            if(queueFamily.queueCount() > 0) {
-                indices.presentFamily = i
-            }
-
-            if(indices.isComplete)
-                return@forEach
-            i++
-        }
-        return indices
-    }
 
     private fun createVulkanInstance(): VkInstance {
         if(enableValidationLayers)
@@ -163,16 +122,19 @@ object Vulkan {
         }
     }
 
-    private fun getRequiredExtensions(): PointerBuffer {
-        val extensions = Window.getRequiredExtensions()
 
-        if (enableValidationLayers) {
+    private fun getRequiredExtensions(): PointerBuffer {
+        val glfwExtensions = Window.getRequiredExtensions()!!
+        if(enableValidationLayers) {
+            val extensions = BufferUtils.createPointerBuffer(glfwExtensions.capacity() + 1)
+            extensions.put(glfwExtensions)
             extensions.put(memUTF8(VK_EXT_DEBUG_REPORT_EXTENSION_NAME))
             extensions.flip()
+            return extensions
         }
-
-        return extensions
+        return glfwExtensions
     }
+
 
     private fun mainLoop() {
         while(!window.shouldWindowClose()) {
@@ -181,7 +143,9 @@ object Vulkan {
     }
 
     private fun cleanup() {
-        VK10.vkDestroyInstance(vkInstance, null)
+        device.cleanup()
+        window.destroySurface()
+        vkDestroyInstance(vkInstance, null)
         window.destroyAndTerminate()
     }
 }
