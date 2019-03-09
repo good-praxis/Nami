@@ -47,6 +47,7 @@ object Vulkan {
         window.getVulkanSurface()
         device = Device()
         device.pickAndBindDevice()
+        device.setupSwapchain()
 
     }
 
