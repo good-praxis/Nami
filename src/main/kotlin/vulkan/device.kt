@@ -5,12 +5,14 @@ import com.code.gamerg8.nami.Vulkan
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
+import org.lwjgl.system.MemoryUtil.memAllocLong
 import org.lwjgl.system.MemoryUtil.memUTF8
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.KHRSurface.*
 import org.lwjgl.vulkan.KHRSwapchain.*
 import org.lwjgl.vulkan.VK10.*
 import java.nio.ByteBuffer
+import kotlin.math.log
 
 class Device {
     lateinit var logicalDevice: VkDevice
@@ -26,6 +28,7 @@ class Device {
     lateinit var swapchainExtent: VkExtent2D
     lateinit var swapchainImageViews: Array<Long>
     lateinit var swapchainImages: Array<Long>
+    var commandPool: Long = nullptr
 
     fun pickAndBindDevice() {
         pickPhysicalDevice()
@@ -45,7 +48,24 @@ class Device {
         createImageViews()
     }
 
+    fun createCommandPool() {
+        val queueFamilyIndices = findQueueFamilies(physicalDevice)
+        val poolInfo = VkCommandPoolCreateInfo.calloc()
+        poolInfo.sType(VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO)
+        poolInfo.queueFamilyIndex(queueFamilyIndices.graphicsFamily)
+
+        commandPool = MemoryStack.stackPush().use {
+            val pPool = it.mallocLong(1)
+
+            if(vkCreateCommandPool(logicalDevice, poolInfo, null, pPool) != VK_SUCCESS) {
+                error("Failed to create command pool")
+            }
+            pPool[0]
+        }
+    }
+
     fun cleanup() {
+        vkDestroyCommandPool(logicalDevice, commandPool, null)
         for(imageView in swapchainImageViews) {
             vkDestroyImageView(logicalDevice, imageView, null)
         }
@@ -200,20 +220,27 @@ class Device {
         }
     }
 
+
     private fun findQueueFamilies(device: VkPhysicalDevice): QueueFamilyIndices {
         val indices = QueueFamilyIndices()
         val count = MemoryUtil.memAllocInt(1)
-        VK10.vkGetPhysicalDeviceQueueFamilyProperties(device, count, null)
+        vkGetPhysicalDeviceQueueFamilyProperties(device, count, null)
         val families = VkQueueFamilyProperties.calloc(count[0])
-        VK10.vkGetPhysicalDeviceQueueFamilyProperties(device, count, families)
+        vkGetPhysicalDeviceQueueFamilyProperties(device, count, families)
 
         var i = 0
         families.forEach {  queueFamily ->
-            if(queueFamily.queueCount() > 0 && queueFamily.queueFlags() and VK10.VK_QUEUE_GRAPHICS_BIT != 0) {
+            if(queueFamily.queueCount() > 0 && queueFamily.queueFlags() and VK_QUEUE_GRAPHICS_BIT != 0) {
                 indices.graphicsFamily = i
             }
 
-            if(queueFamily.queueCount() > 0) {
+            val presentSupport = MemoryStack.stackPush().use {
+                val pSupport = it.mallocInt(1)
+                vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Vulkan.getWindow().surface, pSupport)
+                pSupport[0] == VK_TRUE
+            }
+
+            if(queueFamily.queueCount() > 0 && presentSupport) {
                 indices.presentFamily = i
             }
 

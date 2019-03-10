@@ -9,7 +9,7 @@ import org.lwjgl.vulkan.VK10.VK_SUCCESS
 import java.nio.LongBuffer
 
 object DebugCallback: VkDebugReportCallbackEXT() {
-    private var debugPointer: LongBuffer = LongBuffer.allocate(0)
+    private var debugMessenger: Long = Util.nullptr
 
     override fun invoke(flags: Int, objectType: Int, `object`: Long, location: Long, messageCode: Int, pLayerPrefix: Long, pMessage: Long, pUserData: Long): Int {
         val msg = memASCII(pMessage)
@@ -19,7 +19,7 @@ object DebugCallback: VkDebugReportCallbackEXT() {
         return VK_FALSE
     }
 
-    fun createDebugCallback(instance: VkInstance) : Int {
+    fun createDebugCallback() {
         val createInfo = VkDebugReportCallbackCreateInfoEXT.calloc()
         createInfo.sType(VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT)
         createInfo.flags(VK_DEBUG_REPORT_ERROR_BIT_EXT or VK_DEBUG_REPORT_WARNING_BIT_EXT or VK_DEBUG_REPORT_DEBUG_BIT_EXT)
@@ -27,15 +27,21 @@ object DebugCallback: VkDebugReportCallbackEXT() {
 
 
 
-        debugPointer = MemoryStack.stackMallocLong(1)
-        vkCreateDebugReportCallbackEXT(instance, createInfo, null, debugPointer)
-        return 0
+        val debugPointer = MemoryStack.stackMallocLong(1)
+        if (vkCreateDebugReportCallbackEXT(Vulkan.getVkInstance(), createInfo, null, debugPointer) != VK_SUCCESS){
+            error("Couldn't initalized Debug Messenger")
+        }
+        debugMessenger = debugPointer[0]
     }
 
-   fun getDebugPointer() : LongBuffer {
-        if(debugPointer.capacity() == 0) {
+    fun cleanup() {
+        vkDestroyDebugReportCallbackEXT(Vulkan.getVkInstance(), debugMessenger, null)
+    }
+
+   fun getDebugPointer() : Long {
+        if(debugMessenger == Util.nullptr) {
             error("No pointer set")
         }
-        return debugPointer
+        return debugMessenger
     }
 }
