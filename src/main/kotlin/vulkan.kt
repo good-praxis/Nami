@@ -52,7 +52,9 @@ object Vulkan {
 
     private fun initVulkan() {
         vkInstance = createVulkanInstance()
-        DebugCallback.createDebugCallback()
+
+        if(enableValidationLayers) DebugCallback.createDebugCallback()
+
         window.getVulkanSurface()
 
         device = Device()
@@ -217,7 +219,9 @@ object Vulkan {
         pipeline.cleanup(device)
         device.cleanup()
         window.destroySurface()
-        DebugCallback.cleanup()
+
+        if(enableValidationLayers) DebugCallback.cleanup()
+
         vkDestroyInstance(vkInstance, null)
         window.destroyAndTerminate()
     }
