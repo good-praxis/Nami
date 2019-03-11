@@ -6,17 +6,15 @@ import org.lwjgl.glfw.GLFWVulkan
 import org.lwjgl.glfw.GLFWVulkan.glfwCreateWindowSurface
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.vulkan.KHRSurface
-import org.lwjgl.vulkan.VK10.VK_SUCCESS
 
 class Window(private val width: Int, private val height: Int) {
     var surface: Long = Util.nullptr
     private var windowPointer: Long = -1
 
 
-    fun getVulkanWindow(): Long {
+    fun getVulkanWindow() {
         initWindow()
         createWindow()
-        return getWindowPointer()
     }
 
     fun getWindowPointer(): Long {

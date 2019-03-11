@@ -35,7 +35,7 @@ class Buffers {
         }
     }
 
-    fun createCommandBuffers(device: Device, pipeline: GraphicsPipeline) {
+    fun createCommandBuffers(device: Device, pipeline: GraphicsPipeline) { // TODO: RESEARCH COMMAND BUFFERS
         val allocInfo = VkCommandBufferAllocateInfo.calloc()
         allocInfo.sType(VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO)
         allocInfo.commandPool(device.commandPool)

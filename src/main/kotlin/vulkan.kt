@@ -53,7 +53,7 @@ object Vulkan {
     private fun initVulkan() {
         vkInstance = createVulkanInstance()
 
-        if(enableValidationLayers) DebugCallback.createDebugCallback()
+        if(enableValidationLayers) DebugCallback.createDebugCallback() // TODO: REFACTOR TO CLASS
 
         window.getVulkanSurface()
 
@@ -83,7 +83,7 @@ object Vulkan {
         //cleared memory allocation for Vulkans Application Info
         val appInfo = VkApplicationInfo.calloc()
         appInfo.sType(VK_STRUCTURE_TYPE_APPLICATION_INFO)
-        appInfo.pApplicationName(memASCII("Hello Triange"))
+        appInfo.pApplicationName(memASCII("Hello Triange")) //TODO: FIX TYPO
         appInfo.applicationVersion(VK_MAKE_VERSION(1, 0, 0))
         appInfo.pEngineName(memASCII("Nami"))
         appInfo.engineVersion(VK_MAKE_VERSION(1, 0, 0))
@@ -93,7 +93,7 @@ object Vulkan {
         instanceInfo.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
         instanceInfo.pApplicationInfo(appInfo)
 
-        val extensions = getRequiredExtensions()
+        val extensions = getRequiredExtensions() // TODO: CHECK COMPATIBILITY
         instanceInfo.ppEnabledExtensionNames(extensions)
 
         if (enableValidationLayers) {

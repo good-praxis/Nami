@@ -5,14 +5,12 @@ import com.code.gamerg8.nami.Vulkan
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
-import org.lwjgl.system.MemoryUtil.memAllocLong
 import org.lwjgl.system.MemoryUtil.memUTF8
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.KHRSurface.*
 import org.lwjgl.vulkan.KHRSwapchain.*
 import org.lwjgl.vulkan.VK10.*
 import java.nio.ByteBuffer
-import kotlin.math.log
 
 class Device {
     lateinit var logicalDevice: VkDevice
@@ -75,7 +73,7 @@ class Device {
 
     private fun pickPhysicalDevice(){
         MemoryStack.stackPush().use {
-            val instance = Vulkan.getVkInstance()
+            val instance = Vulkan.getVkInstance() // TODO: GET INSTANCE FROM PARAMETERS
             val deviceCountBuffer = it.mallocInt(1)
             vkEnumeratePhysicalDevices(instance, deviceCountBuffer, null)
             if (deviceCountBuffer[0] == 0){
@@ -197,7 +195,7 @@ class Device {
         }
     }
 
-    private fun querySwapChainSupport(device: VkPhysicalDevice): SwapChainSupportDetails {
+    private fun querySwapChainSupport(device: VkPhysicalDevice): SwapChainSupportDetails { // TODO: ADD ERROR?
         val capabilities = VkSurfaceCapabilitiesKHR.calloc()
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Vulkan.getWindow().surface, capabilities)
 
@@ -245,7 +243,7 @@ class Device {
             }
 
             if(indices.isComplete)
-                return@forEach
+                return@forEach // TODO: RESEARCH WHY THIS WORKS
             i++
         }
         return indices
@@ -287,7 +285,7 @@ class Device {
     }
 
     private fun chooseSwapExtent() {
-        if((this.swapchainDetails.capabilities.currentExtent().width().toLong() and 0xFFFFFFFF) != (Integer.MAX_VALUE.toLong() and 0xFFFFFFFF)) {
+        if((this.swapchainDetails.capabilities.currentExtent().width().toLong() and 0xFFFFFFFF) != (Integer.MAX_VALUE.toLong() and 0xFFFFFFFF)) { // TODO: LINE TOO LONG
             this.swapchainExtent = this.swapchainDetails.capabilities.currentExtent()
             return
         }
@@ -298,7 +296,13 @@ class Device {
         buffer.flip()
         val actualExtent = VkExtent2D(buffer)
 
-        val w = maxOf(this.swapchainDetails.capabilities.minImageExtent().width(), minOf(this.swapchainDetails.capabilities.maxImageExtent().width(), actualExtent.width()))
+        val w = maxOf(
+            this.swapchainDetails.capabilities.minImageExtent().width(),
+            minOf(
+                this.swapchainDetails.capabilities.maxImageExtent().width(),
+                actualExtent.width()
+            )
+        )
         val h = maxOf(this.swapchainDetails.capabilities.minImageExtent().height(), minOf(this.swapchainDetails.capabilities.maxImageExtent().height(), actualExtent.height()))
         actualExtent.width(w)
         actualExtent.height(h)

@@ -89,7 +89,7 @@ class GraphicsPipeline {
 
         val colorBlending = VkPipelineColorBlendStateCreateInfo.calloc()
         colorBlending.sType(VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO)
-        colorBlending.logicOpEnable(false)
+        colorBlending.logicOpEnable(false) // TODO: RESEARCH
         colorBlending.logicOp(VK_LOGIC_OP_COPY)
         colorBlending.pAttachments(VkPipelineColorBlendAttachmentState.calloc(1).put(colorBlendAttachment).flip())
 
@@ -230,6 +230,14 @@ class GraphicsPipeline {
         stageInfo.pName(memUTF8(name))
 
         return stageInfo
+        GraphicsPipeline.destory()
+
+    }
+
+    companion object {
+        fun destory() {
+
+        }
     }
 
 }
