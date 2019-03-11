@@ -4,6 +4,7 @@ import org.lwjgl.PointerBuffer
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWVulkan
 import org.lwjgl.glfw.GLFWVulkan.glfwCreateWindowSurface
+import org.lwjgl.glfw.GLFWVulkan.glfwVulkanSupported
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.vulkan.KHRSurface
 
@@ -22,6 +23,7 @@ class Window(private val width: Int, private val height: Int) {
     }
 
     fun getVulkanSurface(): Long {
+        checkCompatibility()
         createSurface()
         return this.surface
     }
@@ -56,6 +58,12 @@ class Window(private val width: Int, private val height: Int) {
 
     private fun createWindow() {
         this.windowPointer = glfwCreateWindow(this.width, this.height, "Vulkan", Util.nullptr, Util.nullptr)
+    }
+
+    private fun checkCompatibility() {
+        if(!glfwVulkanSupported()) {
+            error("Vulkan isn't supported on your device.")
+        }
     }
 
     private fun createSurface() {

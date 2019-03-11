@@ -93,7 +93,7 @@ object Vulkan {
         instanceInfo.sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
         instanceInfo.pApplicationInfo(appInfo)
 
-        val extensions = getRequiredExtensions() // TODO: CHECK COMPATIBILITY
+        val extensions = getRequiredExtensions()
         instanceInfo.ppEnabledExtensionNames(extensions)
 
         if (enableValidationLayers) {
