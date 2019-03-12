@@ -1,6 +1,9 @@
 package com.code.gamerg8.nami
 
+import com.code.gamerg8.nami.Util.UINT64_MAX
 import com.code.gamerg8.nami.vulkan.*
+import org.joml.Vector2f
+import org.joml.Vector3f
 import org.lwjgl.BufferUtils
 import org.lwjgl.PointerBuffer
 import org.lwjgl.system.MemoryStack
@@ -20,33 +23,26 @@ object Vulkan {
     const val enableValidationLayers = true
     val validationLayers = arrayOf("VK_LAYER_LUNARG_standard_validation")
     val deviceExtensions = arrayOf(VK_KHR_SWAPCHAIN_EXTENSION_NAME)
+    const val MaxFramesInFlight = 2
 
 
-    private lateinit var window: Window
-    private lateinit var vkInstance: VkInstance
-    private lateinit var device: Device
-    private lateinit var pipeline: GraphicsPipeline
-    private lateinit var buffers: Buffers
+    lateinit var window: Window
+    lateinit var vkInstance: VkInstance
+    lateinit var device: Device
+    lateinit var pipeline: GraphicsPipeline
+    lateinit var buffers: Buffers
+    lateinit var inFlightFences: Array<Long>
+
+    val indices = memAllocInt(6)
+        .put(0).put(1).put(2).put(2).put(3).put(0)
+        .flip() as IntBuffer
 
     fun run() {
         this.window = Window(WIDTH, HEIGHT)
-        window.getVulkanWindow()
 
         initVulkan()
         mainLoop()
         cleanup()
-    }
-
-    fun getVkInstance(): VkInstance {
-        return vkInstance
-    }
-
-    fun getWindow(): Window {
-        return window
-    }
-
-    fun getDevice(): Device {
-        return device
     }
 
 
@@ -66,10 +62,21 @@ object Vulkan {
         pipeline.createGraphicsPipeline()
 
         buffers = Buffers()
-        buffers.createFramebuffers(device, pipeline)
+        buffers.createFramebuffers()
         device.createCommandPool()
-        buffers.createCommandBuffers(device, pipeline)
-        pipeline.createSemaphores()
+
+        // TODO: THIS IS A PLACEHOLDER
+        val vertexArray: Array<Vertex> = arrayOf(
+            Vertex(Vector2f(-0.5f, -0.5f), Vector3f(1.0f, 0.0f, 0.0f)),
+            Vertex(Vector2f(0.5f, -0.5f), Vector3f(0.0f, 1.0f, 0.0f)),
+            Vertex(Vector2f(0.5f, 0.5f), Vector3f(0.0f, 0.0f, 1.0f)),
+            Vertex(Vector2f(-0.5f, 0.5f), Vector3f(1.0f, 1.0f, 1.0f))
+        )
+
+        buffers.createVertexBuffer(vertexArray)
+        buffers.createIndexBuffer()
+        buffers.createCommandBuffers()
+        pipeline.createSyncObjects()
 
 
 
@@ -156,18 +163,28 @@ object Vulkan {
 
 
     private fun mainLoop() {
+        var currentFrame = 0
+
         while(!window.shouldWindowClose()) {
             window.pollEvents()
-            drawFrame()
+            drawFrame(currentFrame)
+
+            currentFrame = (currentFrame+1) % MaxFramesInFlight
         }
+
+        vkDeviceWaitIdle(device.logicalDevice)
     }
 
-    private fun drawFrame() {
+    private fun drawFrame(currentFrame: Int) {
+        vkWaitForFences(device.logicalDevice, inFlightFences[currentFrame], true, UINT64_MAX)
+        vkResetFences(device.logicalDevice, inFlightFences[currentFrame])
         MemoryStack.stackPush().use { mem ->
             val imageIndex = mem.mallocInt(1)
-            val err = vkAcquireNextImageKHR(device.logicalDevice, device.swapchain, Util.UINT64_MAX, pipeline.imageAvailableSemaphore, VK_NULL_HANDLE, imageIndex)
-            if(err != VK_SUCCESS) {
-                println("!! ${Integer.toHexString(err)} / $err -> ${Util.translateVulkanResult(err)}")
+            val err = vkAcquireNextImageKHR(device.logicalDevice, device.swapchain, UINT64_MAX, pipeline.imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, imageIndex)
+            when(err) {
+                VK_SUCCESS, VK_SUBOPTIMAL_KHR -> Unit
+                VK_ERROR_OUT_OF_DATE_KHR -> { device.recreateSwapChain(); return@use }
+                else -> error("Failed to acquire swap chain images $err")
             }
 
             imageIndex.rewind()
@@ -175,7 +192,7 @@ object Vulkan {
             val submitInfo = VkSubmitInfo.calloc()
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO)
 
-            val waitSemaphores = BufferUtils.createLongBuffer(1).put(pipeline.imageAvailableSemaphore).flip() as LongBuffer
+            val waitSemaphores = BufferUtils.createLongBuffer(1).put(pipeline.imageAvailableSemaphores[currentFrame]).flip() as LongBuffer
             val waitStages = BufferUtils.createIntBuffer(1).put(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT).flip() as IntBuffer
             submitInfo.pWaitDstStageMask(waitStages)
             submitInfo.pWaitSemaphores(waitSemaphores)
@@ -187,13 +204,10 @@ object Vulkan {
                 .flip()
             submitInfo.pCommandBuffers(pCommandBuffers)
 
-            val signalSemaphores = BufferUtils.createLongBuffer(1).put(pipeline.renderFinishedSemaphore).flip() as LongBuffer
+            val signalSemaphores = BufferUtils.createLongBuffer(1).put(pipeline.renderFinishedSemaphores[currentFrame]).flip() as LongBuffer
             submitInfo.pSignalSemaphores(signalSemaphores)
 
-            val err2 = vkQueueSubmit(device.graphicsQueue, submitInfo, VK_NULL_HANDLE)
-            if(err2 != VK_SUCCESS) {
-                error("Failed to submit draw command buffer ${Util.translateVulkanResult(err2)}")
-            }
+            vkQueueSubmit(device.graphicsQueue, submitInfo, inFlightFences[currentFrame])
 
             val presentInfo = VkPresentInfoKHR.calloc()
             presentInfo.sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
@@ -205,12 +219,16 @@ object Vulkan {
             presentInfo.pSwapchains(swapchains)
             presentInfo.pImageIndices(imageIndex)
 
-            vkQueuePresentKHR(device.presentQueue, presentInfo)
+            val err2 = vkQueuePresentKHR(device.presentQueue, presentInfo)
+            when(err2) {
+                VK_SUCCESS -> Unit
+                VK_SUBOPTIMAL_KHR, VK_ERROR_OUT_OF_DATE_KHR -> device.recreateSwapChain()
+                else -> error("Failed to present swap chain images $err2")
+            }
 
             presentInfo.pResults(null)
 
             vkQueueWaitIdle(device.presentQueue)
-            vkDeviceWaitIdle(device.logicalDevice)
         }
     }
 

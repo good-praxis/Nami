@@ -6,7 +6,6 @@ import org.lwjgl.vulkan.EXTDebugReport.*
 import org.lwjgl.vulkan.VK10.VK_FALSE
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.VK10.VK_SUCCESS
-import java.nio.LongBuffer
 
 object DebugCallback: VkDebugReportCallbackEXT() {
     private var debugMessenger: Long = Util.nullptr
@@ -28,14 +27,14 @@ object DebugCallback: VkDebugReportCallbackEXT() {
 
 
         val debugPointer = MemoryStack.stackMallocLong(1)
-        if (vkCreateDebugReportCallbackEXT(Vulkan.getVkInstance(), createInfo, null, debugPointer) != VK_SUCCESS){
+        if (vkCreateDebugReportCallbackEXT(Vulkan.vkInstance, createInfo, null, debugPointer) != VK_SUCCESS){
             error("Couldn't initalized Debug Messenger")
         }
         debugMessenger = debugPointer[0]
     }
 
     fun cleanup() {
-        vkDestroyDebugReportCallbackEXT(Vulkan.getVkInstance(), debugMessenger, null)
+        vkDestroyDebugReportCallbackEXT(Vulkan.vkInstance, debugMessenger, null)
     }
 
    fun getDebugPointer() : Long {

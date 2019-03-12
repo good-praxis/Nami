@@ -5,7 +5,7 @@ import com.code.gamerg8.nami.Vulkan
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
-import org.lwjgl.system.MemoryUtil.memUTF8
+import org.lwjgl.system.MemoryUtil.*
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.KHRSurface.*
 import org.lwjgl.vulkan.KHRSwapchain.*
@@ -46,6 +46,21 @@ class Device {
         createImageViews()
     }
 
+    fun prepareRecreatedSwapchain() {
+        Vulkan.pipeline.createRenderPass()
+        Vulkan.pipeline.createGraphicsPipeline()
+        Vulkan.buffers.createFramebuffers()
+        Vulkan.buffers.createCommandBuffers()
+    }
+
+    fun recreateSwapChain() {
+        vkDeviceWaitIdle(logicalDevice)
+        cleanupSwapchain()
+
+        setupSwapchain()
+        prepareRecreatedSwapchain()
+    }
+
     fun createCommandPool() {
         val queueFamilyIndices = findQueueFamilies(physicalDevice)
         val poolInfo = VkCommandPoolCreateInfo.calloc()
@@ -62,6 +77,18 @@ class Device {
         }
     }
 
+    fun findMemoryType(typeFiler: Int, properties: Int): Int {
+        val memProperties = VkPhysicalDeviceMemoryProperties.calloc()
+        vkGetPhysicalDeviceMemoryProperties(physicalDevice, memProperties)
+
+        for (i in 0 until memProperties.memoryTypeCount()) {
+            if (typeFiler and (1 shl i) != 0 && memProperties.memoryTypes(i).propertyFlags() and properties == properties) {
+                return i
+            }
+        }
+        error("failed to find suitable memory type!")
+    }
+
     fun cleanup() {
         vkDestroyCommandPool(logicalDevice, commandPool, null)
         for(imageView in swapchainImageViews) {
@@ -71,9 +98,29 @@ class Device {
         vkDestroyDevice(this.logicalDevice, null)
     }
 
+    fun cleanupSwapchain() {
+        for(framebuffer in Vulkan.buffers.swapchainFramebuffers) {
+            vkDestroyFramebuffer(logicalDevice, framebuffer, null)
+        }
+
+        val commandBufferPointers = memAllocPointer(Vulkan.buffers.commandBuffers.size)
+        Vulkan.buffers.commandBuffers.forEach { commandBufferPointers.put(it) }
+        commandBufferPointers.flip()
+        vkFreeCommandBuffers(logicalDevice, commandPool, commandBufferPointers)
+        memFree(commandBufferPointers)
+
+        vkDestroyPipeline(logicalDevice, Vulkan.pipeline.pipeline, null)
+        vkDestroyPipelineLayout(logicalDevice, Vulkan.pipeline.pipelineLayout, null)
+        vkDestroyRenderPass(logicalDevice, Vulkan.pipeline.renderPass, null)
+        for(imageView in swapchainImageViews) {
+            vkDestroyImageView(logicalDevice, imageView, null)
+        }
+        vkDestroySwapchainKHR(logicalDevice, swapchain, null)
+    }
+
     private fun pickPhysicalDevice(){
         MemoryStack.stackPush().use {
-            val instance = Vulkan.getVkInstance() // TODO: GET INSTANCE FROM PARAMETERS
+            val instance = Vulkan.vkInstance
             val deviceCountBuffer = it.mallocInt(1)
             vkEnumeratePhysicalDevices(instance, deviceCountBuffer, null)
             if (deviceCountBuffer[0] == 0){
@@ -197,20 +244,20 @@ class Device {
 
     private fun querySwapChainSupport(device: VkPhysicalDevice): SwapChainSupportDetails { // TODO: ADD ERROR?
         val capabilities = VkSurfaceCapabilitiesKHR.calloc()
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Vulkan.getWindow().surface, capabilities)
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Vulkan.window.surface, capabilities)
 
         return MemoryStack.stackPush().use {
             val formatCount = it.mallocInt(1)
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, Vulkan.getWindow().surface, formatCount, null)
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, Vulkan.window.surface, formatCount, null)
 
             val pFormats = VkSurfaceFormatKHR.calloc(formatCount[0])
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, Vulkan.getWindow().surface, formatCount, pFormats)
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, Vulkan.window.surface, formatCount, pFormats)
 
             val presentModeCount = it.mallocInt(1)
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, Vulkan.getWindow().surface, presentModeCount, null)
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, Vulkan.window.surface, presentModeCount, null)
 
             val modes = it.mallocInt(presentModeCount[0])
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, Vulkan.getWindow().surface, presentModeCount, modes)
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, Vulkan.window.surface, presentModeCount, modes)
 
             val modeArray = Array<Int>(presentModeCount[0]) { i -> modes[i] }
 
@@ -234,7 +281,7 @@ class Device {
 
             val presentSupport = MemoryStack.stackPush().use {
                 val pSupport = it.mallocInt(1)
-                vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Vulkan.getWindow().surface, pSupport)
+                vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Vulkan.window.surface, pSupport)
                 pSupport[0] == VK_TRUE
             }
 
@@ -318,7 +365,7 @@ class Device {
 
         val createInfo = VkSwapchainCreateInfoKHR.calloc()
         createInfo.sType(VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR)
-        createInfo.surface(Vulkan.getWindow().surface)
+        createInfo.surface(Vulkan.window.surface)
         createInfo.minImageCount(imageCount)
         createInfo.imageFormat(this.swapchainImageFormat)
         createInfo.imageColorSpace(this.swapchainFormat.colorSpace())

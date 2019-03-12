@@ -13,8 +13,8 @@ class GraphicsPipeline {
     var pipeline: Long = nullptr
     var pipelineLayout: Long = nullptr
     var renderPass: Long = nullptr
-    var imageAvailableSemaphore: Long = nullptr
-    var renderFinishedSemaphore: Long = nullptr
+    lateinit var imageAvailableSemaphores: Array<Long>
+    lateinit var renderFinishedSemaphores: Array<Long>
 
     fun createGraphicsPipeline() {
         val vertShaderCode = javaClass.getResourceAsStream("/shaders/vert.spv").readBytes()
@@ -29,6 +29,8 @@ class GraphicsPipeline {
 
         val vertexInputInfo = VkPipelineVertexInputStateCreateInfo.calloc()
         vertexInputInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
+        vertexInputInfo.pVertexBindingDescriptions(Vertex.getBindingDescription())
+        vertexInputInfo.pVertexAttributeDescriptions(Vertex.getAttributeDescription())
 
         val inputAssembly = VkPipelineInputAssemblyStateCreateInfo.calloc()
         inputAssembly.sType(VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO)
@@ -38,8 +40,8 @@ class GraphicsPipeline {
         val viewport = VkViewport.calloc()
         viewport.x(0f)
         viewport.y(0f)
-        viewport.width(Vulkan.getDevice().swapchainExtent.width().toFloat())
-        viewport.height(Vulkan.getDevice().swapchainExtent.height().toFloat())
+        viewport.width(Vulkan.device.swapchainExtent.width().toFloat())
+        viewport.height(Vulkan.device.swapchainExtent.height().toFloat())
         viewport.minDepth(0f)
         viewport.maxDepth(1f)
 
@@ -47,7 +49,7 @@ class GraphicsPipeline {
         val offset = VkOffset2D.calloc()
         offset.set(0, 0)
         scissor.offset(offset)
-        scissor.extent(Vulkan.getDevice().swapchainExtent)
+        scissor.extent(Vulkan.device.swapchainExtent)
 
         val viewportState = VkPipelineViewportStateCreateInfo.calloc()
         viewportState.sType(VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO)
@@ -98,7 +100,7 @@ class GraphicsPipeline {
 
         this.pipelineLayout = MemoryStack.stackPush().use {
             val pLayout = it.mallocLong(1)
-            if(vkCreatePipelineLayout(Vulkan.getDevice().logicalDevice, pipelineLayoutInfo, null, pLayout) != VK_SUCCESS)
+            if(vkCreatePipelineLayout(Vulkan.device.logicalDevice, pipelineLayoutInfo, null, pLayout) != VK_SUCCESS)
                 error("Failed to create pipeline layout")
             pLayout[0]
         }
@@ -123,18 +125,18 @@ class GraphicsPipeline {
 
         this.pipeline = MemoryStack.stackPush().use {
             val pPipeline = it.mallocLong(1)
-            if(vkCreateGraphicsPipelines(Vulkan.getDevice().logicalDevice, VK_NULL_HANDLE, pipelineInfo, null, pPipeline) != VK_SUCCESS)
+            if(vkCreateGraphicsPipelines(Vulkan.device.logicalDevice, VK_NULL_HANDLE, pipelineInfo, null, pPipeline) != VK_SUCCESS)
                 error("Failed to create graphics pipeline")
             pPipeline[0]
         }
 
-        vkDestroyShaderModule(Vulkan.getDevice().logicalDevice, vertModule, null)
-        vkDestroyShaderModule(Vulkan.getDevice().logicalDevice, fragModule, null)
+        vkDestroyShaderModule(Vulkan.device.logicalDevice, vertModule, null)
+        vkDestroyShaderModule(Vulkan.device.logicalDevice, fragModule, null)
     }
 
     fun createRenderPass() {
         val colorAttachment = VkAttachmentDescription.calloc(1)
-        colorAttachment.format(Vulkan.getDevice().swapchainImageFormat)
+        colorAttachment.format(Vulkan.device.swapchainImageFormat)
         colorAttachment.samples(VK_SAMPLE_COUNT_1_BIT)
 
         colorAttachment.loadOp(VK_ATTACHMENT_LOAD_OP_CLEAR)
@@ -174,31 +176,46 @@ class GraphicsPipeline {
 
         this.renderPass = MemoryStack.stackPush().use {
             val pRenderPass = it.mallocLong(1)
-            if(vkCreateRenderPass(Vulkan.getDevice().logicalDevice, renderPassInfo, null, pRenderPass) != VK_SUCCESS)
+            if(vkCreateRenderPass(Vulkan.device.logicalDevice, renderPassInfo, null, pRenderPass) != VK_SUCCESS)
                 error("Could not create render pass")
             pRenderPass[0]
         }
     }
 
-    fun createSemaphores() {
+    fun createSyncObjects() {
+        imageAvailableSemaphores = Array<Long>(Vulkan.MaxFramesInFlight) { nullptr }
+        renderFinishedSemaphores = Array<Long>(Vulkan.MaxFramesInFlight) { nullptr }
+        Vulkan.inFlightFences = Array<Long>(Vulkan.MaxFramesInFlight) { nullptr }
+
         val semaphoreInfo = VkSemaphoreCreateInfo.calloc()
         semaphoreInfo.sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO)
+
+        val fenceInfo = VkFenceCreateInfo.calloc()
+        fenceInfo.sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO)
+        fenceInfo.flags(VK_FENCE_CREATE_SIGNALED_BIT)
 
         MemoryStack.stackPush().use {
             val pAvailable = it.mallocLong(1)
             val pRender = it.mallocLong(1)
-
-            if(vkCreateSemaphore(Vulkan.getDevice().logicalDevice, semaphoreInfo, null, pAvailable) != VK_SUCCESS || vkCreateSemaphore(Vulkan.getDevice().logicalDevice, semaphoreInfo, null, pRender) != VK_SUCCESS)
-                error("Failed to create semaphores")
-
-            imageAvailableSemaphore = pAvailable[0]
-            renderFinishedSemaphore = pRender[0]
+            val pFence = it.mallocLong(1)
+            for(i in 0 until Vulkan.MaxFramesInFlight) {
+                if(vkCreateSemaphore(Vulkan.device.logicalDevice, semaphoreInfo, null, pAvailable) != VK_SUCCESS
+                    || vkCreateSemaphore(Vulkan.device.logicalDevice, semaphoreInfo, null, pRender) != VK_SUCCESS
+                    || vkCreateFence(Vulkan.device.logicalDevice, fenceInfo, null, pFence) != VK_SUCCESS)
+                    error("Failed to create sync objects!")
+                imageAvailableSemaphores[i] = pAvailable[0]
+                renderFinishedSemaphores[i] = pRender[0]
+                Vulkan.inFlightFences[i] = pFence[0]
+            }
         }
     }
 
     fun cleanup(device: Device) {
-        vkDestroySemaphore(device.logicalDevice, renderFinishedSemaphore, null)
-        vkDestroySemaphore(device.logicalDevice, imageAvailableSemaphore, null)
+        for(i in 0 until Vulkan.MaxFramesInFlight) {
+            vkDestroySemaphore(Vulkan.device.logicalDevice, renderFinishedSemaphores[i], null)
+            vkDestroySemaphore(Vulkan.device.logicalDevice, imageAvailableSemaphores[i], null)
+            vkDestroyFence(Vulkan.device.logicalDevice, Vulkan.inFlightFences[i], null)
+        }
         vkDestroyPipeline(device.logicalDevice, pipeline, null)
         vkDestroyPipelineLayout(device.logicalDevice, pipelineLayout, null)
         vkDestroyRenderPass(device.logicalDevice, renderPass, null)
@@ -216,7 +233,7 @@ class GraphicsPipeline {
 
         return MemoryStack.stackPush().use {
             val pModule = it.mallocLong(1)
-            if(vkCreateShaderModule(Vulkan.getDevice().logicalDevice, createInfo, null, pModule) != VK_SUCCESS)
+            if(vkCreateShaderModule(Vulkan.device.logicalDevice, createInfo, null, pModule) != VK_SUCCESS)
                 error("Failed to create shader module!")
             pModule[0]
         }

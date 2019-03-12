@@ -1,5 +1,6 @@
 package com.code.gamerg8.nami
 
+import com.code.gamerg8.nami.userInput.inputManager
 import org.lwjgl.PointerBuffer
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWVulkan
@@ -11,11 +12,12 @@ import org.lwjgl.vulkan.KHRSurface
 class Window(private val width: Int, private val height: Int) {
     var surface: Long = Util.nullptr
     private var windowPointer: Long = -1
+    val inputManager: inputManager
 
-
-    fun getVulkanWindow() {
+    init {
         initWindow()
         createWindow()
+        inputManager = inputManager(windowPointer)
     }
 
     fun getWindowPointer(): Long {
@@ -33,7 +35,7 @@ class Window(private val width: Int, private val height: Int) {
     }
 
     fun destroySurface() {
-        KHRSurface.vkDestroySurfaceKHR(Vulkan.getVkInstance(), this.surface, null)
+        KHRSurface.vkDestroySurfaceKHR(Vulkan.vkInstance, this.surface, null)
     }
 
     fun destroyAndTerminate() {
@@ -69,7 +71,7 @@ class Window(private val width: Int, private val height: Int) {
     private fun createSurface() {
         MemoryStack.stackPush().use {
             val pSurface = it.mallocLong(1)
-            glfwCreateWindowSurface(Vulkan.getVkInstance(), windowPointer, null, pSurface)
+            glfwCreateWindowSurface(Vulkan.vkInstance, windowPointer, null, pSurface)
             this.surface = pSurface[0]
         }
     }
