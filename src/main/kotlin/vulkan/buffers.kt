@@ -3,6 +3,7 @@ package com.code.gamerg8.nami.vulkan
 import com.code.gamerg8.nami.Util
 import com.code.gamerg8.nami.Util.nullptr
 import com.code.gamerg8.nami.Vulkan
+import org.joml.Vector3f
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.*
 import org.lwjgl.vulkan.VK10.*
@@ -16,6 +17,8 @@ class Buffers {
     var vertexBufferMemory: Long = nullptr
     var indexBuffer: Long = nullptr
     var indexBufferMemory: Long = nullptr
+    lateinit var uniformBuffers: Array<Long>
+    lateinit var uniformBuffersMemory: Array<Long>
 
     fun createFramebuffers() {
         swapchainFramebuffers = Array(Vulkan.device.swapchainImageViews.size) { Util.nullptr }
@@ -91,6 +94,10 @@ class Buffers {
             val offsets = memAllocLong(1).put(0).flip() as LongBuffer
             vkCmdBindVertexBuffers(commandBuffer, 0, vertexBuffers, offsets)
             vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32)
+
+            val pSets = memAllocLong(1).put(Vulkan.descriptorSets[index]).flip() as LongBuffer
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Vulkan.pipeline.pipelineLayout, 0, pSets, null)
+            memFree(pSets)
 
             vkCmdDrawIndexed(commandBuffer, Vulkan.indices.capacity(), 1, 0, 0, 0) // draw 3 vertices (1 instance)
 
@@ -201,7 +208,20 @@ class Buffers {
         vkFreeMemory(Vulkan.device.logicalDevice, stagingBufferMemory, null)
     }
 
-
+    fun createUniformBuffers() {
+        val bufferSize = UniformBufferObject.SizeOfUniformBufferObject.toLong()
+        uniformBuffers = Array<Long>(Vulkan.device.swapchainImages.size) { nullptr }
+        uniformBuffersMemory = Array<Long>(Vulkan.device.swapchainImages.size) { nullptr }
+        val pBuffer = memAllocLong(1)
+        val pMemory = memAllocLong(1)
+        for(i in 0 until Vulkan.device.swapchainImages.size) {
+            createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT or VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, pBuffer, pMemory)
+            uniformBuffers[i] = pBuffer[0]
+            uniformBuffersMemory[i] = pMemory[0]
+        }
+        memFree(pBuffer)
+        memFree(pMemory)
+    }
 
     private fun copyBuffer(srcBuffer: Long, dstBuffer: Long, size: Long) {
         // We create a temporary command buffer to copy the data
@@ -251,6 +271,14 @@ class Buffers {
 
 
     fun cleanup(device: Device) {
+        for(buffer in uniformBuffers) {
+            vkDestroyBuffer(device.logicalDevice, buffer, null)
+        }
+        for(mem in uniformBuffersMemory) {
+            vkFreeMemory(device.logicalDevice, mem, null)
+        }
+        vkDestroyBuffer(device.logicalDevice, indexBuffer, null)
+        vkFreeMemory(device.logicalDevice, indexBufferMemory, null)
         vkDestroyBuffer(device.logicalDevice, vertexBuffer, null)
         vkFreeMemory(device.logicalDevice, vertexBufferMemory, null)
         for (framebuffer in swapchainFramebuffers) {

@@ -1,6 +1,7 @@
 package com.code.gamerg8.nami
 
 import com.code.gamerg8.nami.Util.UINT64_MAX
+import com.code.gamerg8.nami.Util.nullptr
 import com.code.gamerg8.nami.vulkan.*
 import org.joml.Vector2f
 import org.joml.Vector3f
@@ -24,7 +25,14 @@ object Vulkan {
     val validationLayers = arrayOf("VK_LAYER_LUNARG_standard_validation")
     val deviceExtensions = arrayOf(VK_KHR_SWAPCHAIN_EXTENSION_NAME)
     const val MaxFramesInFlight = 2
+    var startTime: Long = nullptr
 
+    val vertexArray: Array<Vertex> = arrayOf(
+        Vertex(Vector2f(-0.5f, -0.5f), Vector3f(1.0f, 0.0f, 0.0f)),
+        Vertex(Vector2f(0.5f, -0.5f), Vector3f(0.0f, 1.0f, 0.0f)),
+        Vertex(Vector2f(0.5f, 0.5f), Vector3f(0.0f, 0.0f, 1.0f)),
+        Vertex(Vector2f(-0.5f, 0.5f), Vector3f(1.0f, 1.0f, 1.0f))
+    )
 
     lateinit var window: Window
     lateinit var vkInstance: VkInstance
@@ -32,6 +40,7 @@ object Vulkan {
     lateinit var pipeline: GraphicsPipeline
     lateinit var buffers: Buffers
     lateinit var inFlightFences: Array<Long>
+    lateinit var descriptorSets: Array<Long>
 
     val indices = memAllocInt(6)
         .put(0).put(1).put(2).put(2).put(3).put(0)
@@ -59,22 +68,19 @@ object Vulkan {
 
         pipeline = GraphicsPipeline()
         pipeline.createRenderPass()
+        pipeline.createDescriptorSetLayout()
         pipeline.createGraphicsPipeline()
+
 
         buffers = Buffers()
         buffers.createFramebuffers()
         device.createCommandPool()
 
-        // TODO: THIS IS A PLACEHOLDER
-        val vertexArray: Array<Vertex> = arrayOf(
-            Vertex(Vector2f(-0.5f, -0.5f), Vector3f(1.0f, 0.0f, 0.0f)),
-            Vertex(Vector2f(0.5f, -0.5f), Vector3f(0.0f, 1.0f, 0.0f)),
-            Vertex(Vector2f(0.5f, 0.5f), Vector3f(0.0f, 0.0f, 1.0f)),
-            Vertex(Vector2f(-0.5f, 0.5f), Vector3f(1.0f, 1.0f, 1.0f))
-        )
-
         buffers.createVertexBuffer(vertexArray)
         buffers.createIndexBuffer()
+        buffers.createUniformBuffers()
+        device.createDescriptorPool()
+        createDescriptorSets()
         buffers.createCommandBuffers()
         pipeline.createSyncObjects()
 
@@ -175,6 +181,47 @@ object Vulkan {
         vkDeviceWaitIdle(device.logicalDevice)
     }
 
+    private fun createDescriptorSets() {
+        val layouts = memAllocLong(device.swapchainImages.size)
+        repeat(device.swapchainImages.size) {
+            layouts.put(pipeline.descriptorSetLayout)
+        }
+        layouts.flip()
+        val allocInfo = VkDescriptorSetAllocateInfo.calloc()
+        allocInfo.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO)
+        allocInfo.descriptorPool(device.descriptorPool)
+        allocInfo.pSetLayouts(layouts)
+
+        val pSets = memAllocLong(device.swapchainImages.size)
+        if(vkAllocateDescriptorSets(device.logicalDevice, allocInfo, pSets) != VK_SUCCESS) {
+            error("Failed to allocate descriptor sets")
+        }
+        descriptorSets = Array<Long>(device.swapchainImages.size) { i -> pSets[i] }
+
+        memFree(pSets)
+
+        // populate descriptors
+        val descriptorWrites = VkWriteDescriptorSet.calloc(descriptorSets.size)
+        for(i in 0 until descriptorSets.size) {
+            val bufferInfo = VkDescriptorBufferInfo.calloc(1)
+            bufferInfo.buffer(buffers.uniformBuffers[i])
+            bufferInfo.offset(0)
+            bufferInfo.range(UniformBufferObject.SizeOfUniformBufferObject.toLong())
+
+            val descriptorWrite = descriptorWrites[i]
+            descriptorWrite.sType(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
+            descriptorWrite.dstSet(descriptorSets[i])
+            descriptorWrite.dstBinding(0)
+            descriptorWrite.dstArrayElement(0)
+
+            descriptorWrite.descriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+
+            descriptorWrite.pBufferInfo(bufferInfo)
+        }
+
+        vkUpdateDescriptorSets(device.logicalDevice, descriptorWrites, null)
+    }
+
     private fun drawFrame(currentFrame: Int) {
         vkWaitForFences(device.logicalDevice, inFlightFences[currentFrame], true, UINT64_MAX)
         vkResetFences(device.logicalDevice, inFlightFences[currentFrame])
@@ -188,6 +235,7 @@ object Vulkan {
             }
 
             imageIndex.rewind()
+            updateUniformBuffer(imageIndex[0])
 
             val submitInfo = VkSubmitInfo.calloc()
             submitInfo.sType(VK_STRUCTURE_TYPE_SUBMIT_INFO)
@@ -230,6 +278,42 @@ object Vulkan {
 
             vkQueueWaitIdle(device.presentQueue)
         }
+    }
+
+    fun updateUniformBuffer(currentFrame: Int) {
+        if(startTime  == nullptr) startTime = System.currentTimeMillis()
+        val ubo = UniformBufferObject()
+        val upAxis = Vector3f(0f, 0f, 1f)
+
+        val currentTime = System.currentTimeMillis()
+        val time = currentTime - startTime
+
+        val angle = time / 1000f * Math.PI/2f // 90 degrees per second
+        ubo.model.identity().rotate(angle.toFloat(), upAxis)
+
+        val eyePos = Vector3f(2f)
+        val centerPos = Vector3f(0f)
+
+        ubo.view.setLookAt(eyePos, centerPos, upAxis)
+
+        ubo.proj.setPerspective(45f * Math.PI.toFloat() / 180f,
+            device.swapchainExtent.width().toFloat() / device.swapchainExtent.height().toFloat(),
+            0.1f, 10f)
+        ubo.proj.m11(ubo.proj.m11()* (-1f)) // invert Y Axis
+
+        val ppData = memAllocPointer(1)
+        vkMapMemory(device.logicalDevice, buffers.uniformBuffersMemory[currentFrame], 0, UniformBufferObject.SizeOfUniformBufferObject.toLong(), 0, ppData)
+        val data = ppData[0]
+
+        val uboData = memAlloc(UniformBufferObject.SizeOfUniformBufferObject)
+        ubo.putIn(uboData)
+        uboData.flip()
+        memCopy(memAddress(uboData), data, UniformBufferObject.SizeOfUniformBufferObject.toLong())
+
+        vkUnmapMemory(device.logicalDevice, buffers.uniformBuffersMemory[currentFrame])
+
+        memFree(uboData)
+        memFree(ppData)
     }
 
     private fun cleanup() {

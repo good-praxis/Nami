@@ -27,6 +27,7 @@ class Device {
     lateinit var swapchainImageViews: Array<Long>
     lateinit var swapchainImages: Array<Long>
     var commandPool: Long = nullptr
+    var descriptorPool: Long = nullptr
 
     fun pickAndBindDevice() {
         pickPhysicalDevice()
@@ -48,6 +49,7 @@ class Device {
 
     fun prepareRecreatedSwapchain() {
         Vulkan.pipeline.createRenderPass()
+        Vulkan.pipeline.createDescriptorSetLayout()
         Vulkan.pipeline.createGraphicsPipeline()
         Vulkan.buffers.createFramebuffers()
         Vulkan.buffers.createCommandBuffers()
@@ -89,7 +91,30 @@ class Device {
         error("failed to find suitable memory type!")
     }
 
+    fun createDescriptorPool() {
+        val poolSize = VkDescriptorPoolSize.calloc(1)
+        poolSize.descriptorCount(swapchainImages.size)
+        poolSize.type(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+
+        val poolInfo = VkDescriptorPoolCreateInfo.calloc()
+        poolInfo.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
+        poolInfo.pPoolSizes(poolSize)
+        poolInfo.maxSets(swapchainImages.size)
+
+        val pPool = memAllocLong(1)
+
+        if(vkCreateDescriptorPool(logicalDevice, poolInfo, null, pPool) != VK_SUCCESS) {
+            error("Could not create descriptor pool")
+        }
+
+        descriptorPool = pPool[0]
+
+        memFree(pPool)
+    }
+
     fun cleanup() {
+        vkDestroyDescriptorPool(logicalDevice, descriptorPool, null)
+
         vkDestroyCommandPool(logicalDevice, commandPool, null)
         for(imageView in swapchainImageViews) {
             vkDestroyImageView(logicalDevice, imageView, null)
@@ -99,6 +124,7 @@ class Device {
     }
 
     fun cleanupSwapchain() {
+        vkDestroyDescriptorSetLayout(logicalDevice, Vulkan.pipeline.descriptorSetLayout, null)
         for(framebuffer in Vulkan.buffers.swapchainFramebuffers) {
             vkDestroyFramebuffer(logicalDevice, framebuffer, null)
         }

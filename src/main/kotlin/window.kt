@@ -55,7 +55,7 @@ class Window(private val width: Int, private val height: Int) {
         initApi()
 
         hintApi(GLFW_CLIENT_API, GLFW_NO_API)
-        hintApi(GLFW_RESIZABLE, GLFW_FALSE)
+        hintApi(GLFW_RESIZABLE, GLFW_TRUE)
     }
 
     private fun createWindow() {

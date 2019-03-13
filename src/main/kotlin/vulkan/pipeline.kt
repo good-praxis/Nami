@@ -4,10 +4,11 @@ import com.code.gamerg8.nami.Util.nullptr
 import com.code.gamerg8.nami.Vulkan
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack
-import org.lwjgl.system.MemoryUtil.memUTF8
+import org.lwjgl.system.MemoryUtil.*
 import org.lwjgl.vulkan.VK10.*
 import org.lwjgl.vulkan.*
 import org.lwjgl.vulkan.KHRSwapchain.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+import java.nio.LongBuffer
 
 class GraphicsPipeline {
     var pipeline: Long = nullptr
@@ -15,6 +16,7 @@ class GraphicsPipeline {
     var renderPass: Long = nullptr
     lateinit var imageAvailableSemaphores: Array<Long>
     lateinit var renderFinishedSemaphores: Array<Long>
+    var descriptorSetLayout: Long = nullptr
 
     fun createGraphicsPipeline() {
         val vertShaderCode = javaClass.getResourceAsStream("/shaders/vert.spv").readBytes()
@@ -65,7 +67,7 @@ class GraphicsPipeline {
         rasterizer.polygonMode(VK_POLYGON_MODE_FILL)
         rasterizer.lineWidth(1f)
         rasterizer.cullMode(VK_CULL_MODE_BACK_BIT)
-        rasterizer.frontFace(VK_FRONT_FACE_CLOCKWISE)
+        rasterizer.frontFace(VK_FRONT_FACE_COUNTER_CLOCKWISE)
         rasterizer.depthBiasEnable(false)
 
         // Multisampling
@@ -97,6 +99,8 @@ class GraphicsPipeline {
 
         val pipelineLayoutInfo = VkPipelineLayoutCreateInfo.calloc()
         pipelineLayoutInfo.sType(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+        val pLayouts = memAllocLong(1).put(descriptorSetLayout).flip() as LongBuffer
+        pipelineLayoutInfo.pSetLayouts(pLayouts)
 
         this.pipelineLayout = MemoryStack.stackPush().use {
             val pLayout = it.mallocLong(1)
@@ -104,6 +108,8 @@ class GraphicsPipeline {
                 error("Failed to create pipeline layout")
             pLayout[0]
         }
+
+        memFree(pLayouts)
 
         val pipelineInfo = VkGraphicsPipelineCreateInfo.calloc(1)
         pipelineInfo.sType(VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO)
@@ -211,6 +217,7 @@ class GraphicsPipeline {
     }
 
     fun cleanup(device: Device) {
+        vkDestroyDescriptorSetLayout(device.logicalDevice, descriptorSetLayout, null)
         for(i in 0 until Vulkan.MaxFramesInFlight) {
             vkDestroySemaphore(Vulkan.device.logicalDevice, renderFinishedSemaphores[i], null)
             vkDestroySemaphore(Vulkan.device.logicalDevice, imageAvailableSemaphores[i], null)
@@ -219,6 +226,27 @@ class GraphicsPipeline {
         vkDestroyPipeline(device.logicalDevice, pipeline, null)
         vkDestroyPipelineLayout(device.logicalDevice, pipelineLayout, null)
         vkDestroyRenderPass(device.logicalDevice, renderPass, null)
+    }
+
+    fun createDescriptorSetLayout() {
+        val uboLayoutBinding = VkDescriptorSetLayoutBinding.calloc(1)
+        uboLayoutBinding.binding(0)
+        uboLayoutBinding.descriptorCount(1)
+        uboLayoutBinding.descriptorType(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+
+        uboLayoutBinding.stageFlags(VK_SHADER_STAGE_VERTEX_BIT)
+
+        val layoutInfo = VkDescriptorSetLayoutCreateInfo.calloc()
+        layoutInfo.sType(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
+        layoutInfo.pBindings(uboLayoutBinding)
+
+        val pBinding: LongBuffer = memAllocLong(1)
+        if(vkCreateDescriptorSetLayout(Vulkan.device.logicalDevice, layoutInfo, null, pBinding) != VK_SUCCESS) {
+            error("failed to create descriptor set layout")
+        }
+
+        descriptorSetLayout = pBinding[0]
+        memFree(pBinding)
     }
 
 
@@ -247,14 +275,6 @@ class GraphicsPipeline {
         stageInfo.pName(memUTF8(name))
 
         return stageInfo
-        GraphicsPipeline.destory()
-
-    }
-
-    companion object {
-        fun destory() {
-
-        }
     }
 
 }
