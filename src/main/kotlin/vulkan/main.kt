@@ -1,8 +1,9 @@
-package com.code.gamerg8.nami
+package com.code.gamerg8.nami.vulkan
 
+import com.code.gamerg8.nami.OnKeyDown
 import com.code.gamerg8.nami.Util.UINT64_MAX
 import com.code.gamerg8.nami.Util.nullptr
-import com.code.gamerg8.nami.vulkan.*
+import com.code.gamerg8.nami.Window
 import org.joml.Vector2f
 import org.joml.Vector3f
 import org.lwjgl.BufferUtils
@@ -15,8 +16,6 @@ import org.lwjgl.vulkan.KHRSwapchain.*
 import org.lwjgl.vulkan.VK10.*
 import java.nio.IntBuffer
 import java.nio.LongBuffer
-
-
 
 object Vulkan {
     const val WIDTH = 800
@@ -47,15 +46,14 @@ object Vulkan {
         .flip() as IntBuffer
 
     fun run() {
-        this.window = Window(WIDTH, HEIGHT)
-
         initVulkan()
         mainLoop()
         cleanup()
     }
 
 
-    private fun initVulkan() {
+    fun initVulkan() {
+        this.window = Window(WIDTH, HEIGHT)
         vkInstance = createVulkanInstance()
 
         if(enableValidationLayers) DebugCallback.createDebugCallback() // TODO: REFACTOR TO CLASS
@@ -84,8 +82,7 @@ object Vulkan {
         buffers.createCommandBuffers()
         pipeline.createSyncObjects()
 
-
-
+        window.inputManager.onKeyDown += ::OnKeyDown //TODO: Please find another place for this later
     }
 
 

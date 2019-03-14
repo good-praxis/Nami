@@ -1,7 +1,6 @@
 package com.code.gamerg8.nami.vulkan
 
 import com.code.gamerg8.nami.Util.nullptr
-import com.code.gamerg8.nami.Vulkan
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.*

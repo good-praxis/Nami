@@ -2,12 +2,10 @@ package com.code.gamerg8.nami.vulkan
 
 import com.code.gamerg8.nami.Util
 import com.code.gamerg8.nami.Util.nullptr
-import com.code.gamerg8.nami.Vulkan
-import org.joml.Vector3f
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.*
-import org.lwjgl.vulkan.VK10.*
 import org.lwjgl.vulkan.*
+import org.lwjgl.vulkan.VK10.*
 import java.nio.LongBuffer
 
 class Buffers {
@@ -73,7 +71,7 @@ class Buffers {
                 error("Failed to begin recording of command buffer")
 
             val renderPassInfo = VkRenderPassBeginInfo.calloc()
-            renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
+            renderPassInfo.sType(VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO)
             renderPassInfo.renderPass(Vulkan.pipeline.renderPass)
             renderPassInfo.framebuffer(swapchainFramebuffers[index])
             val renderArea = VkRect2D.calloc()

@@ -1,6 +1,7 @@
 package com.code.gamerg8.nami
 
 import com.code.gamerg8.nami.userInput.inputManager
+import com.code.gamerg8.nami.vulkan.Vulkan
 import org.lwjgl.PointerBuffer
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWVulkan

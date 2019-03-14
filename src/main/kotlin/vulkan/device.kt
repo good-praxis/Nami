@@ -1,7 +1,6 @@
 package com.code.gamerg8.nami.vulkan
 
 import com.code.gamerg8.nami.Util.nullptr
-import com.code.gamerg8.nami.Vulkan
 import org.lwjgl.BufferUtils
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
@@ -342,19 +341,8 @@ class Device {
         this.swapchainImageFormat = this.swapchainFormat.format()
     }
 
-    private fun chooseSwapPresentMode() {
-        var bestMode = VK_PRESENT_MODE_FIFO_KHR
-
-        for(mode in this.swapchainDetails.presentModes) {
-            if(mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                this.swapchainPresentMode = mode
-                return
-            }
-            else if(mode == VK_PRESENT_MODE_IMMEDIATE_KHR)
-                bestMode = mode
-        }
-
-        this.swapchainPresentMode = bestMode
+    private fun chooseSwapPresentMode() { // TODO: MAKE CUSTOMIZABLE
+        this.swapchainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR
     }
 
     private fun chooseSwapExtent() {

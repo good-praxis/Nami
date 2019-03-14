@@ -1,5 +1,6 @@
-package com.code.gamerg8.nami
+package com.code.gamerg8.nami.vulkan
 
+import com.code.gamerg8.nami.Util
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.memASCII
 import org.lwjgl.vulkan.EXTDebugReport.*
