@@ -8,13 +8,26 @@ class inputManager(window: Long) {
     val onKeyUp = Event<Int>()
     val onKeyChar = Event<Int>()
 
-    private val keyStateCB: keyStateCB
-    private val keyCharCB: keyCharCB
-
     init {
-        keyStateCB = keyStateCB(onKeyDown, onKeyRepeat, onKeyUp)
-        GLFW.glfwSetKeyCallback(window, keyStateCB)
-        keyCharCB = keyCharCB(onKeyChar)
-        GLFW.glfwSetCharCallback(window, keyCharCB)
+        GLFW.glfwSetKeyCallback(window) { window, key, scanCode, action, mods ->
+                when(action) {
+                    GLFW.GLFW_PRESS -> onKeyDown(key)
+                    GLFW.GLFW_RELEASE -> onKeyUp(key)
+                    GLFW.GLFW_REPEAT -> onKeyRepeat(key)
+                    else -> error("unknown key action")
+                }
+        }
+        GLFW.glfwSetCharCallback(window) { window, codePoint ->
+            onKeyChar(codePoint)
+        }
+        GLFW.glfwSetCursorPosCallback(window) { window, xpos, ypos ->
+            println("$xpos $ypos")
+        }
+        GLFW.glfwSetMouseButtonCallback(window) { window, button, action, mods ->
+
+        }
+        GLFW.glfwSetScrollCallback(window) { window, xoffset, yoffset ->
+
+        }
     }
 }

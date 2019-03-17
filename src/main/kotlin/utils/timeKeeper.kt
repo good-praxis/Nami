@@ -3,9 +3,20 @@ package com.code.gamerg8.nami.timeKeeper
 object TimeKeeper {
     private val launchTime: Long = System.currentTimeMillis()
     private val timeMap: MutableMap<String, Long> = hashMapOf()
+    private var lastCall: Long = 0
 
     fun getDeltaSinceLaunch(): Long {
         return launchTime - System.currentTimeMillis()
+    }
+
+    fun getDeltaSinceLastCall(): Long {
+        if(lastCall == 0L) {
+            lastCall = System.currentTimeMillis()
+            return 0L
+        }
+        val delta = System.currentTimeMillis() - lastCall
+        lastCall = System.currentTimeMillis()
+        return delta
     }
 
     fun getDeltaInSecondsSinceLaunch(): Long {

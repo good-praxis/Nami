@@ -8,14 +8,3 @@ class Event<T> {
     operator fun minusAssign(handler: KFunction1<T, Unit>) { handlers.remove(handler)}
     operator fun invoke(value: T) { for (handler in handlers) handler(value) }
 }
-
-val e = Event<String>() // define event
-
-fun main(args : Array<String>) {
-    e += ::DoTheThing
-    e("sdfsdf") // invoke
-}
-
-fun DoTheThing(text: String){
-    println(text)
-}

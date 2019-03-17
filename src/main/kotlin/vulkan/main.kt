@@ -1,9 +1,12 @@
 package com.code.gamerg8.nami.vulkan
 
-import com.code.gamerg8.nami.OnKeyDown
+import com.code.gamerg8.nami.onKeyDown
 import com.code.gamerg8.nami.Util.UINT64_MAX
 import com.code.gamerg8.nami.Util.nullptr
 import com.code.gamerg8.nami.Window
+import com.code.gamerg8.nami.gameLoop
+import com.code.gamerg8.nami.onKeyUp
+import com.code.gamerg8.nami.timeKeeper.TimeKeeper
 import org.joml.Vector2f
 import org.joml.Vector3f
 import org.lwjgl.BufferUtils
@@ -26,6 +29,9 @@ object Vulkan {
     const val MaxFramesInFlight = 2
     var startTime: Long = nullptr
 
+    var tempRotation: Int = 0 //TODO: refactor
+    var tempAngle: Double = 0.0
+
     val vertexArray: Array<Vertex> = arrayOf(
         Vertex(Vector2f(-0.5f, -0.5f), Vector3f(1.0f, 0.0f, 0.0f)),
         Vertex(Vector2f(0.5f, -0.5f), Vector3f(0.0f, 1.0f, 0.0f)),
@@ -45,9 +51,9 @@ object Vulkan {
         .put(0).put(1).put(2).put(2).put(3).put(0)
         .flip() as IntBuffer
 
-    fun run() {
+    fun run(gameLoop: Unit) {
         initVulkan()
-        mainLoop()
+        mainLoop(gameLoop)
         cleanup()
     }
 
@@ -82,7 +88,8 @@ object Vulkan {
         buffers.createCommandBuffers()
         pipeline.createSyncObjects()
 
-        window.inputManager.onKeyDown += ::OnKeyDown //TODO: Please find another place for this later
+        window.inputManager.onKeyDown += ::onKeyDown //TODO: Please find another place for this later
+        window.inputManager.onKeyUp += ::onKeyUp
     }
 
 
@@ -165,11 +172,12 @@ object Vulkan {
     }
 
 
-    private fun mainLoop() {
+    private fun mainLoop(gameLoop: Unit) {
         var currentFrame = 0
 
         while(!window.shouldWindowClose()) {
             window.pollEvents()
+            gameLoop()
             drawFrame(currentFrame)
 
             currentFrame = (currentFrame+1) % MaxFramesInFlight
@@ -282,10 +290,10 @@ object Vulkan {
         val ubo = UniformBufferObject()
         val upAxis = Vector3f(0f, 0f, 1f)
 
-        val currentTime = System.currentTimeMillis()
-        val time = currentTime - startTime
+        val deltaTime = TimeKeeper.getDeltaSinceLastCall()
 
-        val angle = time / 1000f * Math.PI/2f // 90 degrees per second
+        tempAngle += (deltaTime / 1000f * Math.PI/2f) * tempRotation
+        val angle = tempAngle
         ubo.model.identity().rotate(angle.toFloat(), upAxis)
 
         val eyePos = Vector3f(2f)
